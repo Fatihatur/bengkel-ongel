@@ -55,12 +55,20 @@ jobs:
     executor: php-executor
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - composer-cache-{{ checksum "composer.lock" }}
+      - run: composer install --no-progress --prefer-dist
       - run: ./vendor/bin/pint --test
 
   static_analysis:
     executor: php-executor
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - composer-cache-{{ checksum "composer.lock" }}
+      - run: composer install --no-progress --prefer-dist
       - run: ./vendor/bin/phpstan analyse
 
 workflows:
