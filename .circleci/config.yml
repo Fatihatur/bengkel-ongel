@@ -1,0 +1,79 @@
+version: 2.1
+
+executors:
+  php-executor:
+    docker:
+      - image: cimg/php:8.2-browsers
+    working_directory: ~/laravel
+
+orbs:
+  node: circleci/node@5.1.0
+
+commands:
+  install_dependencies:
+    description: "Install PHP and Node dependencies"
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev zip unzip git
+      - run: composer install --no-progress --prefer-dist
+      - run: npm install
+      - run: npm run build
+
+  setup_env:
+    description: "Setup environment file and cache"
+    steps:
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+
+jobs:
+  build:
+    executor: php-executor
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - composer-cache-{{ checksum "composer.lock" }}
+      - install_dependencies
+      - save_cache:
+          paths:
+            - vendor
+          key: composer-cache-{{ checksum "composer.lock" }}
+      - setup_env
+
+  test:
+    executor: php-executor
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - composer-cache-{{ checksum "composer.lock" }}
+      - run:
+          name: Run Laravel Tests
+          command: php artisan test
+
+  lint:
+    executor: php-executor
+    steps:
+      - checkout
+      - run: ./vendor/bin/pint --test
+
+  static_analysis:
+    executor: php-executor
+    steps:
+      - checkout
+      - run: ./vendor/bin/phpstan analyse
+
+workflows:
+  version: 2
+  laravel_ci:
+    jobs:
+      - build
+      - lint:
+          requires:
+            - build
+      - static_analysis:
+          requires:
+            - build
+      - test:
+          requires:
+            - build
